@@ -1,0 +1,155 @@
+---
+title: "Storage Capacity Estimate"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+The goal of this notebook is to estimate both contemporary and restorable storage capacity using the modified TDI approach developed by [Jones et al., [2018]](https://doi.org/10.1002/hyp.11405).  
+
+A few quick notes on data:
+-All data is housed in the Palmer Lab direcotry (Choptank/Nate/Storage_Capacity)
+-The 1m DEM was downloaded from http://imap.maryland.gov/Pages/lidar-dem-download-files.aspx
+-This script will be housed at http://floodhydrology.com/DEM_Inundate/Storage_Capacity_Estimate.html
+-The points are approximate locations and codes are from memory. I will work with KH to downlaod directly from the Choptank-DB
+
+#Step 1: Setup workspace, download data, and organize
+
+```{r, message=FALSE, warning=FALSE,}
+#Clear memory (KH says not to do this...maybe I'll convert eventually)
+rm(list=ls(all=TRUE))
+
+#Turn off warnings
+options(warn=-1)
+
+#Setworking directory
+setwd("//storage.research.sesync.org/palmer-group-data/choptank/Nate/Storage_Capacity")
+
+#Download packages 
+library(raster)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(actuar)
+library(poweRlaw)
+library(dplyr)
+
+#Download data 
+#dem<-raster("I_Data/Caroline_DEM_2013_1m")
+#jl_area<-readOGR("II_Work/.","JL_clip")T
+#jr_area<-readOGR("II_Work/.","JR_Clip")
+#area<-readOGR("II_Work/.","extent")
+dem<-raster("II_work/jr_dem")
+pnts<-readOGR("II_Work/.","Wetland_Locations")
+
+#limt dem extent
+#dem<-crop(dem, area)
+#crop<-raster::aggregate(rbind(jl_area, jr_area))
+#crop<-rasterize(crop, dem, 1)
+#dem<-crop*dem
+
+#Remove variables from workspace
+remove(list=ls()[ls()!="dem" & ls()!="pnts"])
+
+```
+
+#Step 2: Delineate internally draining basins
+[Add description of WhiteBox GAT and WhiteBox Tools]
+
+##Step 2.1 Identify depresions
+Use WhiteBox Tools to identify depresions using Monte Carlo approach
+
+```{r, message=FALSE, warning=FALSE}
+#Create function for depressional analysis 
+Depression_Identification<-function(
+  dem=dem, 
+  min_size=100, #number of cells (for now)
+  iterations=100, #number of Monte Carlo iterations
+  dem_rmse=0.0607, #RMSE of 18.5 cm
+  workspace="C:\\ScratchWorkspace\\", 
+  wbt_path="C:/WBT/whitebox_tools"){invisible()
+
+  #Set working directory
+  setwd(paste(workspace))
+  
+  #Filter the DEM
+  dem<-na.omit(dem)
+  dem_filter<- focal(dem, w=focalWeight(dem, 5, "Gauss"))
+  dem_filter<-focal(dem_filter, w=focalWeight(dem, 5, "Gauss"))
+  dem_filter<- focal(dem_filter, w=focalWeight(dem, 5, "Gauss"))
+  dem_filter@crs<-dem@crs
+  
+  #Write raster to ScratchWorkspace
+  writeRaster(dem_filter,
+              file="dem_filter.tif",
+              overwrite=T)
+  
+  #Identify depressions using WhiteBox GAT Monte Carlo Approach
+  system(paste(paste(wbt_path), 
+                "-r=StochasticDepressionAnalysis", 
+                 paste0("--wd=",workspace),
+                "--dem='dem_filter.tif'", 
+                "-o='depression.tif'",
+                paste0("--rmse=",dem_rmse),
+                paste0("--iterations=",iterations)))
+  
+  #Reclass raster
+  system(paste(paste(wbt_path), 
+                "-r=Reclass", 
+                 paste0("--wd=",workspace),
+                "-i='depression.tif'", 
+                "-o='reclass.tif'",
+                "--reclass_vals='0;0;0.95';1;0.95;1"))
+  
+  #Identify clusters of inundated cells
+  system(paste(paste(wbt_path), 
+               "-r=Clump",
+               paste0("--wd=",workspace),
+               "-i='reclass.tif'", 
+               "-o='group.tif'",
+               "--diag", 
+               "--zero_back"))
+  
+  #Identify Clusters greater than 100m2
+  r<-raster(paste0(workspace,"group.tif")) #Read raster
+  r_pnts<-data.frame(rasterToPoints(r))        #Convert to XYZ pnts
+  r_remove<-r_pnts %>% group_by(group) %>% tally() #sum # of raster cells for each group
+  r_remove<-r_remove$group[r_remove$n>min_size]
+  r_pnts$group[r_pnts$group %in% r_remove]<-0
+  r_pnts<-r_pnts[r_pnts$group!=0,]
+  r_pnts<-SpatialPoints(r_pnts[,1:2])
+  r_remove<-rasterize(r_pnts, r, 0)
+  r_remove[is.na(r_remove)]<-1
+  r<-r*r_remove
+  r[r==0]<-NA
+  
+  #Export depression raster
+  r
+}
+
+#Run function
+jr_depressions<-Depression_Identification(
+  dem=dem, 
+  min_size=100, 
+  workspace="C:\\ScratchWorkspace\\", 
+  wbt_path="C:/WBT/whitebox_tools")
+```
+
+```{r, echo=FALSE}
+plot(jr_depressions)
+```
+
+
+
+##2.2 Identify internally draining basins
+
+```{r, message=FALSE, warning=FALSE}
+
+```
+
+#Step 3: Estimate Storage Capacity
+
