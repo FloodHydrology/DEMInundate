@@ -39,18 +39,18 @@ library(rgdal)
 library(rgeos)
 library(dplyr)
 
+#Download package from GIT
+library(devtools)
+install_github("FloodHydrology/DEM_Inundate")
+library(DEM_inundate)
+
 #Download relevant data 
 dem<-raster(paste0(data_dir,"II_work/jl_dem"))
 pnt<-readOGR(paste0(data_dir,"II_Work/."),"Wetland_Locations")
 pnt<-pnt[pnt$Name=="DK",]
 burn<-readOGR(paste0(data_dir,"II_Work/."),"DarkBay_Burn")
 
-#Source relevant functions (eventually I'll figure out how to bring these in as a package...)
-source("GIW_burn.R")
-source("GIW_identification.R")
-source("GIW_subshed_delineation.R")
-source("GIW_stage_storage.R")
-source("GIW_max_inundation.R")
+
 
 ```
 
