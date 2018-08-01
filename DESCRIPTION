@@ -9,3 +9,15 @@ Description: More to com
 License: MIT License
 Encoding: UTF-8
 LazyData: true
+ByteCompile: true
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+Imports:
+    raster,
+    sp,
+    rgdal,
+    rgeos,
+    dplyr
+RoxygenNote: 6.0.1
