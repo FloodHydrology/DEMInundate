@@ -1,0 +1,11 @@
+Package: DEMInundate
+Type: Package
+Title: Inundates floodplain and depressional wetlands based on DEM analysis
+Version: 0.1.0
+Author: Nathan Jones
+Maintainer: Nathan Jones <njones@sesync.org>
+Description: More to com
+    Use four spaces when indenting paragraphs within the Description.
+License: MIT License
+Encoding: UTF-8
+LazyData: true
